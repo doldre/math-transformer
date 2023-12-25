@@ -8,6 +8,7 @@ import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
 from model import Transformer, ModelArgs
+from datetime import datetime
 
 # model init
 model_args = dict(
@@ -20,6 +21,10 @@ model_args = dict(
     max_seq_len=256,
     dropout=0,
 )  # start with model_args from command line
+
+# wandb logging
+wandb_log = True
+wandb_project = "integer_multiply_transformer"
 
 device_type = 'cuda'
 device = torch.device(device_type)
@@ -45,6 +50,10 @@ weight_decay = 1e-1
 min_lr = 0
 iters = 0
 
+wandb_run_name = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+if wandb_log:
+    import wandb
+    wandb.init(project=wandb_project, name=wandb_run_name)
 
 # learning rate decay scheduler (cosine with warmup)
 def get_lr(it):
@@ -172,9 +181,13 @@ def train_model(model, num_digits, result_num_digits):
         iters += 1
         if (i + 1) % log_interval == 0:
             print(f"Step {i} LR: {lr:.6f} Loss: {loss.item():.4f}")
+            if wandb_log:
+                wandb.log({"loss": loss.item(), "lr": lr}, step=iters)
         if (i + 1) % eval_interval == 0:
             acc, all_acc = eval_model(raw_model, num_digits, result_num_digits)
             print(f"Step {i} LR: {lr:.6f} Loss: {loss.item():.4f} Acc: {acc:.4f} All_Acc: {all_acc:.4f}")
+            if wandb_log:
+                wandb.log({"eval/acc": acc, "eval/all_acc": all_acc}, step=iters)
 
             if all_acc >= 1.0:
                 print(f"success in {i} steps")
